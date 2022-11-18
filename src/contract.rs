@@ -1,7 +1,8 @@
 use apollo_utils::assets::receive_assets;
 use apollo_utils::responses::merge_responses;
 use astroport_core::factory::PairType;
-use astroport_core::querier::query_fee_info;
+// use astroport_core::factory::PairType;
+// use astroport_core::querier::query_fee_info;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -13,6 +14,7 @@ use cw_dex::astroport::AstroportPool;
 use cw_dex::traits::Pool;
 
 use crate::error::ContractError;
+use crate::helpers::query_fee_info;
 use crate::math::calc_xyk_balancing_swap;
 use crate::msg::{CallbackMsg, ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::ASTROPORT_FACTORY;
@@ -90,6 +92,7 @@ pub fn execute_balancing_provide_liquidity(
 
             let pool_reserves: [Asset; 2] =
                 [(&pool_res.assets[0]).into(), (&pool_res.assets[1]).into()];
+            // TODO: This assert can move up to avoid query_pool_info unnecessary
             if assets.len() > 2 {
                 return Err(ContractError::MoreThanTwoAssets {});
             }
