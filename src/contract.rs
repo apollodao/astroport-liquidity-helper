@@ -1,7 +1,5 @@
 use apollo_utils::assets::receive_assets;
 use apollo_utils::responses::merge_responses;
-use astroport_core::factory::PairType;
-use astroport_core::querier::query_fee_info;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -9,6 +7,8 @@ use cosmwasm_std::{
 };
 use cw2::set_contract_version;
 use cw_asset::{Asset, AssetList};
+use cw_dex::astroport::helpers::query_fee_info;
+use cw_dex::astroport::msg::PairType;
 use cw_dex::astroport::AstroportPool;
 use cw_dex::traits::Pool;
 
