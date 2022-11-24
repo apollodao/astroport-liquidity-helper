@@ -1,12 +1,16 @@
 use astroport::factory::InstantiateMsg as AstroportFactoryInstantiateMsg;
+use astroport::generator::InstantiateMsg as GeneratorInstantiateMsg;
 use astroport_liquidity_helper::{helpers::LiquidityHelper, msg::InstantiateMsg};
 use cosmwasm_std::{to_binary, Addr, Coin, Uint128};
 use cw_dex::osmosis::OsmosisPool;
-use cw_it::app::App;
-use cw_multi_test::Wasm;
-use astroport::generator::InstantiateMsg as GeneratorInstantiateMsg;
-use testcontainers::clients::Cli;
-pub const ASTROPORT_LIQUIDITY_HELPER_WASM_FILE: &str = "artifacts/astroport_liquidity_helper.wasm";
+use cw_it::app::App as RpcRunner;
+use cw_it::Cli;
+use osmosis_testing::{
+    cosmrs::proto::cosmwasm::wasm::v1::MsgExecuteContractResponse, Account, Module, Runner,
+    SigningAccount, Wasm,
+};
+pub const ASTROPORT_LIQUIDITY_HELPER_WASM_FILE: &str =
+    "artifacts/astroport_liquidity_helper_unoptimized.wasm";
 pub const ASTROPORT_FACTORY_WASM_FILE: &str = "artifacts/astroport_factory-aarch64.wasm";
 pub const ASTROPORT_GENERATOR_WASM_FILE: &str = "artifacts/astroport_generator-aarch64.wasm";
 pub const CW1_WASM_FILE: &str = "artifacts/cw1_whitelist.wasm";
@@ -35,31 +39,40 @@ fn merge_coins(coins: &[&[Coin]]) -> Vec<Coin> {
 }
 
 #[test]
-/// Runs all tests again the Osmosis bindings
-pub fn test_with_osmosis_bindings() {
+/// Runs all tests against LocalTerra
+pub fn test_with_localterra() {
+    // let _ = env_logger::builder().is_test(true).try_init();
     let docker: Cli = Cli::default();
-    let app = App::new(TEST_CONFIG_PATH, &docker);
+    let app = RpcRunner::new(TEST_CONFIG_PATH, &docker);
 
     let accs = app
-        .init_accounts(
-            &[
-                Coin::new(1_000_000_000_000, "uatom"),
-                Coin::new(1_000_000_000_000, "uosmo"),
-            ],
-            2,
-        )
-        .unwrap();
+        .test_config
+        .import_all_accounts()
+        .into_values()
+        .collect::<Vec<_>>();
 
     test_balancing_provide_liquidity(&app, accs);
 }
 
-/// Instantiates the liquidity helper contract
-pub fn setup_osmosis_liquidity_provider_tests<R>(
-    app: &R,
-    accs: &[SigningAccount],
-) -> LiquidityHelper
+pub struct Contract {
+    pub address: String,
+    pub code_id: u64,
+}
+
+impl Contract {
+    pub fn new(address: String, code_id: u64) -> Self {
+        Self { address, code_id }
+    }
+}
+
+pub struct AstroportContracts {
+    pub factory: Contract,
+    pub generator: Contract,
+}
+
+pub fn instantiate_astroport<'a, R>(app: &'a R, accs: &[SigningAccount]) -> AstroportContracts
 where
-    R: for<'a> Runner<'a>,
+    R: Runner<'a>,
 {
     let wasm = Wasm::new(app);
     let admin = &accs[0];
@@ -83,7 +96,7 @@ where
         .instantiate(
             astroport_generator_code_id,
             &GeneratorInstantiateMsg {
-                owner: admin,
+                owner: admin.address(),
                 whitelist_code_id: todo!(),
                 factory: todo!(),
                 generator_controller: todo!(),
@@ -113,7 +126,7 @@ where
                 token_code_id: todo!(),
                 fee_address: None,
                 generator_address: todo!(),
-                owner: admin,
+                owner: admin.address(),
                 whitelist_code_id: todo!(),
             },
             Some(&admin.address()),    // contract admin used for migration
@@ -124,6 +137,26 @@ where
         .unwrap()
         .data
         .address;
+
+    AstroportContracts {
+        factory: Contract::new(astroport_factory, astroport_factory_code_id),
+        generator: Contract::new(astroport_generator, astroport_generator_code_id),
+    }
+}
+
+/// Instantiates the liquidity helper contract
+pub fn setup_astroport_liquidity_provider_tests<R>(
+    app: &R,
+    accs: &[SigningAccount],
+) -> LiquidityHelper
+where
+    R: for<'a> Runner<'a>,
+{
+    let wasm = Wasm::new(app);
+    let admin = &accs[0];
+
+    // Instantiate astroport contracts
+    let astroport_contracts = instantiate_astroport(app, accs);
 
     // Load compiled wasm bytecode
     let astroport_liquidity_helper_wasm_byte_code =
@@ -137,8 +170,10 @@ where
     // Instantiate the contract
     let astroport_liquidity_helper = wasm
         .instantiate(
-            astroport_factory_code_id,
-            &InstantiateMsg { astroport_factory },
+            astroport_liquidity_helper_code_id,
+            &InstantiateMsg {
+                astroport_factory: astroport_contracts.factory.address,
+            },
             Some(&admin.address()), // contract admin used for migration
             Some("Astroport Liquidity Helper"), // contract label
             &[],                    // funds
@@ -159,35 +194,38 @@ pub fn test_balancing_provide_liquidity<R>(app: &R, accs: Vec<SigningAccount>)
 where
     R: for<'a> Runner<'a>,
 {
-    let liquidity_helper = setup_osmosis_liquidity_provider_tests(app, &accs);
-    let gamm = Gamm::new(app);
+    let liquidity_helper = setup_astroport_liquidity_provider_tests(app, &accs);
+    // let gamm = Gamm::new(app);
 
     // Create 1:1 pool
-    let pool_liquidity = vec![Coin::new(1_000_000, "uatom"), Coin::new(1_000_000, "uosmo")];
-    let pool_id = gamm
-        .create_basic_pool(&pool_liquidity, &accs[0])
-        .unwrap()
-        .data
-        .pool_id;
-    let pool = OsmosisPool::new(pool_id);
+    // let pool_liquidity = vec![Coin::new(1_000_000, "uatom"), Coin::new(1_000_000, "uosmo")];
+    // let pool_id = gamm
+    //     .create_basic_pool(&pool_liquidity, &accs[0])
+    //     .unwrap()
+    //     .data
+    //     .pool_id;
+    // let pool = OsmosisPool::new(pool_id);
 
-    // Balancing Provide liquidity
-    println!("Balancing provide liquidity");
-    let coins = vec![Coin::new(100_000, "uatom"), Coin::new(100_000, "uosmo")];
-    let msg = liquidity_helper
-        .balancing_provide_liquidity(
-            coins.clone().into(),
-            Uint128::one(),
-            to_binary(&pool).unwrap(),
-        )
-        .unwrap();
-    let _res = execute_cosmos_msg::<_, MsgExecuteContractResponse>(app, &msg, &accs[1]).unwrap();
+    // // Balancing Provide liquidity
+    // println!("Balancing provide liquidity");
+    // let coins = vec![Coin::new(100_000, "uatom"), Coin::new(100_000, "uosmo")];
+    // let msg = liquidity_helper
+    //     .balancing_provide_liquidity(
+    //         coins.clone().into(),
+    //         Uint128::one(),
+    //         to_binary(&pool).unwrap(),
+    //     )
+    //     .unwrap();
+
+    // let _res = app
+    //     .execute_cosmos_msgs::<MsgExecuteContractResponse>(&[msg], &accs[1])
+    //     .unwrap();
 
     // Check pool liquidity after adding
-    let initial_pool_liquidity = vec![Coin::new(1_000_000, "uatom"), Coin::new(1_000_000, "uosmo")];
-    let pool_liquidity = gamm.query_pool_reserves(pool_id).unwrap();
-    assert_eq!(
-        pool_liquidity,
-        merge_coins(&[&initial_pool_liquidity, &coins])
-    );
+    // let initial_pool_liquidity = vec![Coin::new(1_000_000, "uatom"), Coin::new(1_000_000, "uosmo")];
+    // let pool_liquidity = gamm.query_pool_reserves(pool_id).unwrap();
+    // assert_eq!(
+    //     pool_liquidity,
+    //     merge_coins(&[&initial_pool_liquidity, &coins])
+    // );
 }
