@@ -33,7 +33,7 @@ contracts:
   astroport_liquidity_helper:
     url: "https://github.com/apollodao/astroport-liquidity-helper.git"
     branch: "master"
-    artifact: astroport_liquidity_helper_unoptimized.wasm
+    artifact: astroport_liquidity_helper.wasm
     preferred_source: "url"
 
   astro_token:
