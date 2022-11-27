@@ -1,6 +1,6 @@
 //! Module containing implementations of calculations needed for swapping
 
-use cosmwasm_std::{Decimal, StdError, StdResult, Uint128};
+use cosmwasm_std::{Decimal, Decimal256, StdError, StdResult, Uint128, Uint256};
 use cw_asset::Asset;
 use cw_bigint::BigInt;
 
@@ -27,12 +27,14 @@ fn constant_product_formula(
     ask_reserve: Uint128,
     offer_amount: Uint128,
     fee: Decimal,
-) -> Uint128 {
-    let cp = offer_reserve * ask_reserve;
-    let return_amount: Uint128 = (Decimal::from_ratio(ask_reserve, 1u8)
-        - Decimal::from_ratio(cp, offer_reserve + offer_amount))
-        * Uint128::from(1u8);
-    return_amount * (Decimal::one() - fee)
+) -> StdResult<Uint128> {
+    let cp = offer_reserve.full_mul(ask_reserve);
+    let return_amount: Uint256 = (Decimal256::from_ratio(ask_reserve, 1u8)
+        - Decimal256::from_ratio(cp, offer_reserve + offer_amount))
+        * Uint256::from(1u8);
+    let commission_amount: Uint256 = return_amount * Decimal256::from(fee);
+    let return_amount: Uint256 = return_amount - commission_amount;
+    Ok(return_amount.try_into()?)
 }
 
 fn bigint_to_uint128(input: BigInt) -> StdResult<Uint128> {
@@ -102,7 +104,7 @@ pub fn calc_xyk_balancing_swap(
     let x = (bigint_sqrt(discriminant)? - b) / (2u128 * a);
 
     // Divide by precision to get final result and convert to Uint128
-    let offer_amount = bigint_to_uint128(x / precision)?;
+    let offer_amount = bigint_to_uint128(x / &precision)?;
     let offer_asset = Asset {
         amount: offer_amount,
         info: offer_asset_info.clone(),
@@ -110,11 +112,11 @@ pub fn calc_xyk_balancing_swap(
 
     // Calculate return amount from swap
     let return_amount = constant_product_formula(
-        bigint_to_uint128(offer_reserve)?,
-        bigint_to_uint128(ask_reserve)?,
+        bigint_to_uint128(offer_reserve / &precision)?,
+        bigint_to_uint128(ask_reserve / &precision)?,
         offer_amount,
         fee,
-    );
+    )?;
     let return_asset = Asset {
         amount: return_amount,
         info: ask_asset_info.clone(),
@@ -156,6 +158,10 @@ mod test {
             Decimal::from_ratio(ask_balance + return_amount, offer_balance - offer_amount);
         let reserve_ratio_after_swap =
             Decimal::from_ratio(ask_reserve - return_amount, offer_reserve + offer_amount);
+        println!(
+            "asset_ratio_after_swap: {}, reserve_ratio_after_swap: {}",
+            asset_ratio_after_swap, reserve_ratio_after_swap
+        );
         assert_decimal_almost_eq(asset_ratio_after_swap, reserve_ratio_after_swap);
     }
 
@@ -248,7 +254,11 @@ mod test {
         let fee = Decimal::permille(3);
 
         // Run test cases
-        for (assets, reserve1, reserve2) in test_cases {
+        for (i, (assets, reserve1, reserve2)) in test_cases.into_iter().enumerate() {
+            println!("Test case {}", i + 1);
+            println!("Assets: {:?}", assets);
+            println!("Reserves: {}, {}", reserve1, reserve2);
+
             // Compare ratios to define offer asset
             let asset_ratio = Decimal::from_ratio(assets[0].amount, assets[1].amount);
             let reserve_ratio = Decimal::from_ratio(reserve1, reserve2);
@@ -280,6 +290,7 @@ mod test {
                 swap_asset.amount,
                 return_asset.amount,
             );
+            println!("------------------------------------");
         }
     }
 
