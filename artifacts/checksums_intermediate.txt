@@ -1,1 +1,1 @@
-292e1bd5db0798adbe8158c5ae29632f9033da428f850ec9c706a648bb25da03  ./target/wasm32-unknown-unknown/release/astroport_liquidity_helper.wasm
+c03f29e93ea68129c657e447d319afa39b4388a8e013a43aed60594b95c22d8d  ./target/wasm32-unknown-unknown/release/astroport_liquidity_helper.wasm

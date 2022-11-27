@@ -44,7 +44,7 @@ impl LiquidityHelper {
     ) -> StdResult<Vec<CosmosMsg>> {
         let (funds, cw20s) = separate_natives_and_cw20s(&assets);
 
-        // Increase allowance for all cw20s
+        // Increase allowance for all Cw20s
         let mut msgs: Vec<CosmosMsg> = cw20s
             .into_iter()
             .map(|asset| {

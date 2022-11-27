@@ -64,7 +64,7 @@ pub fn execute(
                     assets,
                     min_out,
                     pool,
-                } => execute_balancing_provide_liquidity(deps, env, info, assets, min_out, pool),
+                } => execute_callback_provide_liquidity(deps, env, info, assets, min_out, pool),
             }
         }
     }
