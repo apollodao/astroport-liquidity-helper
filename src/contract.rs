@@ -3,7 +3,8 @@ use apollo_utils::responses::merge_responses;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    from_binary, to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult, Uint128,
+    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, Event, MessageInfo, Response,
+    StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw_asset::{Asset, AssetList};
@@ -48,10 +49,11 @@ pub fn execute(
             assets,
             min_out,
             pool,
+            recipient,
         } => {
             let assets = assets.check(deps.api)?;
             let pool: AstroportPool = from_binary(&pool)?;
-            execute_balancing_provide_liquidity(deps, env, info, assets, min_out, pool)
+            execute_balancing_provide_liquidity(deps, env, info, assets, min_out, pool, recipient)
         }
         ExecuteMsg::Callback(msg) => {
             // Only contract can call callbacks
@@ -64,7 +66,22 @@ pub fn execute(
                     assets,
                     min_out,
                     pool,
-                } => execute_callback_provide_liquidity(deps, env, info, assets, min_out, pool),
+                    recipient,
+                } => execute_callback_provide_liquidity(
+                    deps, env, info, assets, min_out, pool, recipient,
+                ),
+                CallbackMsg::ReturnLpTokens {
+                    pool,
+                    balance_before,
+                    recipient,
+                } => execute_callback_return_lp_tokens(
+                    deps,
+                    env,
+                    info,
+                    pool,
+                    balance_before,
+                    recipient,
+                ),
             }
         }
     }
@@ -77,10 +94,19 @@ pub fn execute_balancing_provide_liquidity(
     mut assets: AssetList,
     min_out: Uint128,
     pool: AstroportPool,
+    recipient: Option<String>,
 ) -> Result<Response, ContractError> {
     // Get response with message to do TransferFrom on any Cw20s and assert that
     // native tokens have been received already.
     let receive_res = receive_assets(&info, &env, &assets)?;
+
+    // Unwrap recipient or use caller's address
+    let recipient = recipient.map_or(Ok(info.sender.clone()), |x| deps.api.addr_validate(&x))?;
+
+    // Check lp token balance before, to pass into callback
+    let lp_token_balance = pool
+        .lp_token()
+        .query_balance(&deps.querier, env.contract.address.to_string())?;
 
     match pool.pair_type {
         PairType::Xyk {} => {
@@ -147,20 +173,55 @@ pub fn execute_balancing_provide_liquidity(
 
             // Create message to provide liquidity
             let provide_msg = CallbackMsg::ProvideLiquidity {
-                assets,
+                assets: assets.clone(),
                 min_out,
-                pool,
+                pool: pool.clone(),
+                recipient: recipient.clone(),
             }
             .into_cosmos_msg(&env)?;
             response = response.add_message(provide_msg);
-            return Ok(merge_responses(vec![receive_res, response]));
+
+            // Callback to return LP tokens
+            let callback_msg = CallbackMsg::ReturnLpTokens {
+                pool,
+                balance_before: lp_token_balance,
+                recipient,
+            }
+            .into_cosmos_msg(&env)?;
+
+            let event =
+                Event::new("apollo/astroport-liquidity-helper/execute_balancing_provide_liquidity")
+                    .add_attribute("action", "xyk_provide_liquidity")
+                    .add_attribute("assets", assets.to_string())
+                    .add_attribute("min_out", min_out);
+
+            return Ok(merge_responses(vec![receive_res, response])
+                .add_message(callback_msg)
+                .add_event(event));
         }
         PairType::Stable {} => {
             // For stable pools we are allowed to provide liquidity in any ratio,
             // so we simply provide liquidity with all passed assets.
             let provide_liquidity_res =
-                pool.provide_liquidity(deps.as_ref(), &env, assets, min_out)?;
-            return Ok(merge_responses(vec![receive_res, provide_liquidity_res]));
+                pool.provide_liquidity(deps.as_ref(), &env, assets.clone(), min_out)?;
+
+            // Callback to return LP tokens
+            let callback_msg = CallbackMsg::ReturnLpTokens {
+                pool,
+                balance_before: lp_token_balance,
+                recipient,
+            }
+            .into_cosmos_msg(&env)?;
+
+            let event =
+                Event::new("apollo/astroport-liquidity-helper/execute_balancing_provide_liquidity")
+                    .add_attribute("action", "stable_provide_liquidity")
+                    .add_attribute("assets", assets.to_string())
+                    .add_attribute("min_out", min_out);
+
+            return Ok(merge_responses(vec![receive_res, provide_liquidity_res])
+                .add_message(callback_msg)
+                .add_event(event));
         }
         PairType::Custom(_) => return Err(ContractError::CustomPairType {}),
     };
@@ -178,9 +239,47 @@ pub fn execute_callback_provide_liquidity(
     assets: AssetList,
     min_out: Uint128,
     pool: AstroportPool,
+    recipient: Addr,
 ) -> Result<Response, ContractError> {
-    let res = pool.provide_liquidity(deps.as_ref(), &env, assets, min_out)?;
-    Ok(res)
+    let lp_token_balance = pool
+        .lp_token()
+        .query_balance(&deps.querier, env.contract.address.to_string())?;
+
+    let res = pool.provide_liquidity(deps.as_ref(), &env, assets.clone(), min_out)?;
+
+    let callback_msg = CallbackMsg::ReturnLpTokens {
+        pool: pool.clone(),
+        balance_before: lp_token_balance,
+        recipient,
+    }
+    .into_cosmos_msg(&env)?;
+
+    let event = Event::new("apollo/astroport-liquidity-helper/execute_callback_provide_liquidity")
+        .add_attribute("assets", assets.to_string());
+
+    Ok(res.add_message(callback_msg).add_event(event))
+}
+
+pub fn execute_callback_return_lp_tokens(
+    deps: DepsMut,
+    env: Env,
+    _info: MessageInfo,
+    pool: AstroportPool,
+    balance_before: Uint128,
+    recipient: Addr,
+) -> Result<Response, ContractError> {
+    let lp_token = pool.lp_token();
+    let lp_token_balance = lp_token.query_balance(&deps.querier, env.contract.address)?;
+
+    let return_amount = lp_token_balance.checked_sub(balance_before)?;
+    let return_asset = Asset::new(lp_token, return_amount);
+    let msg = return_asset.transfer_msg(&recipient)?;
+
+    let event = Event::new("apollo/astroport-liquidity-helper/execute_callback_return_lp_tokens")
+        .add_attribute("return_asset", return_asset.to_string())
+        .add_attribute("recipient", recipient);
+
+    Ok(Response::new().add_message(msg).add_event(event))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

@@ -14,6 +14,7 @@ pub enum ExecuteMsg {
         assets: AssetListUnchecked,
         min_out: Uint128,
         pool: Binary,
+        recipient: Option<String>,
     },
     Callback(CallbackMsg),
 }
@@ -24,6 +25,12 @@ pub enum CallbackMsg {
         assets: AssetList,
         min_out: Uint128,
         pool: AstroportPool,
+        recipient: Addr,
+    },
+    ReturnLpTokens {
+        pool: AstroportPool,
+        balance_before: Uint128,
+        recipient: Addr,
     },
 }
 
@@ -43,3 +50,6 @@ pub enum QueryMsg {
     #[returns(Addr)]
     AstroportFactory {},
 }
+
+#[cw_serde]
+pub enum MigrateMsg {}

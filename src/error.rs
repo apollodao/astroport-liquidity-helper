@@ -1,4 +1,4 @@
-use cosmwasm_std::StdError;
+use cosmwasm_std::{OverflowError, StdError};
 use cw_bigint::TryFromBigIntError;
 use cw_dex::CwDexError;
 use thiserror::Error;
@@ -13,6 +13,9 @@ pub enum ContractError {
 
     #[error("{0}")]
     BigIntToU128(#[from] TryFromBigIntError<u128>),
+
+    #[error("{0}")]
+    Overflow(#[from] OverflowError),
 
     #[error("Unauthorized")]
     Unauthorized {},

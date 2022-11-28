@@ -48,16 +48,16 @@ cw2 = "0.15.1"
 schemars = "0.8.11"
 serde = { version = "1.0.145", default-features = false, features = ["derive"] }
 thiserror = { version = "1.0.31" }
-cw-asset = { git = "https://github.com/apollodao/cw-asset", features = ["astroport"] }
-cw-dex = { git = "https://github.com/apollodao/cw-dex" }
-cw-bigint = { git = "https://github.com/apollodao/cw-bigint" }
-apollo-utils = { git = "https://github.com/apollodao/apollo-utils" }
+cw-asset = { git = "https://github.com/apollodao/cw-asset", rev = "5e51773da42ef82faa67576454e8c4b0971097f2", features = ["astroport"] }
+cw-dex = { git = "https://github.com/apollodao/cw-dex", rev = "de7394fdbc74a3401f4227f81389413991b309e3", features = ["astroport"] }
+cw-bigint = { git = "https://github.com/apollodao/cw-bigint", rev = "c2217a76b08cb65204db407f661298c48b01e763" }
+apollo-utils = { git = "https://github.com/apollodao/apollo-utils", rev = "dd3da52653d3dc350b20b46f363ebcfdcd64aa27" }
 cw20 = "0.16"
 
 [dev-dependencies]
 cw-multi-test = "0.15.1"
-osmosis-testing = { git = "https://github.com/apollodao/osmosis-rust.git" }
-cw-it = { git = "https://github.com/apollodao/cw-it", features = ["astroport"] }
+osmosis-testing = { git = "https://github.com/apollodao/osmosis-rust.git", rev = "52ca8eaa4b2926fea01a68f4d7e7253ad29d88b3" }
+cw-it = { git = "https://github.com/apollodao/cw-it", rev = "e55d206ff53ce1a0977525da5831ee77d6884e76", features = ["astroport"] }
 # cw-it = { path = "../cw-it", features = ["astroport"] }
 astroport = { git = "https://github.com/apollodao/astroport", rev = "3d1793e6936ca03d8a58c51bbc2611a19566e82a" }
 env_logger = "0.9.0"
