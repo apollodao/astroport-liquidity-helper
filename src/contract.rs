@@ -4,7 +4,7 @@ use apollo_utils::responses::merge_responses;
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, Event, MessageInfo, Response,
-    StdResult, Uint128,
+    StdError, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw_asset::{Asset, AssetList};
@@ -278,6 +278,12 @@ pub fn execute_callback_return_lp_tokens(
     let event = Event::new("apollo/astroport-liquidity-helper/execute_callback_return_lp_tokens")
         .add_attribute("return_asset", return_asset.to_string())
         .add_attribute("recipient", recipient);
+
+    if 1 == 1 {
+        return Err(ContractError::Std(StdError::GenericErr {
+            msg: "at end of return lp callback".to_string(),
+        }));
+    }
 
     Ok(Response::new().add_message(msg).add_event(event))
 }

@@ -1,13 +1,12 @@
-use std::collections::HashMap;
-use std::str::FromStr;
+use astroport::asset::{Asset as AstroAsset, AssetInfo as AstroAssetInfo, PairInfo};
+use astroport::factory::{FeeInfoResponse, PairType, PairsResponse, QueryMsg as FactoryQueryMsg};
 
-use astroport::asset::{Asset as AstroAsset, AssetInfo as AstroAssetInfo};
-use astroport::factory::{FeeInfoResponse, PairType, QueryMsg as FactoryQueryMsg};
-use astroport::pair::{ExecuteMsg as PairExecuteMsg, QueryMsg as PairQueryMsg};
+use astroport::pair::ExecuteMsg as PairExecuteMsg;
+use astroport::pair::QueryMsg as PairQueryMsg;
 use astroport_liquidity_helper::math::calc_xyk_balancing_swap;
 use astroport_liquidity_helper::{helpers::LiquidityHelper, msg::InstantiateMsg};
 use cosmwasm_std::{to_binary, Addr, Coin, Decimal, Uint128};
-use cw20::{AllowanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
+use cw20::{AllowanceResponse, BalanceResponse, Cw20ExecuteMsg, Cw20QueryMsg};
 use cw_asset::{Asset, AssetInfo, AssetList};
 use cw_dex::astroport::msg::{PoolResponse, SimulationResponse};
 use cw_dex::astroport::AstroportPool;
@@ -19,6 +18,8 @@ use osmosis_testing::{
     cosmrs::proto::cosmwasm::wasm::v1::MsgExecuteContractResponse, Account, Module, Runner,
     SigningAccount, Wasm,
 };
+use std::collections::HashMap;
+use std::str::FromStr;
 
 const TEST_CONFIG_PATH: &str = "tests/configs/terra.yaml";
 pub const ASTROPORT_LIQUIDITY_HELPER_WASM_FILE: &str = "artifacts/astroport_liquidity_helper.wasm";
@@ -26,19 +27,19 @@ pub const ASTROPORT_LIQUIDITY_HELPER_WASM_FILE: &str = "artifacts/astroport_liqu
 #[test]
 /// Runs all tests against the Osmosis bindings.
 /// This works since there are no big differences between the chains.
-pub fn test_with_osmosis_bindings() {
-    let app = OsmosisTestApp::default();
+// pub fn test_with_osmosis_bindings() {
+//     let app = OsmosisTestApp::default();
 
-    let accs = app
-        .init_accounts(&[Coin::new(1_000_000_000_000_000, "uluna")], 2)
-        .unwrap();
+//     let accs = app
+//         .init_accounts(&[Coin::new(1_000_000_000_000_000, "uluna")], 2)
+//         .unwrap();
 
-    // Upload astroport contracts
-    let astroport_code_ids = upload_astroport_contracts(&app, &accs[0]);
+//     // Upload astroport contracts
+//     let astroport_code_ids = upload_astroport_contracts(&app, &accs[0]);
 
-    test_balancing_provide_liquidity(&app, &accs, &astroport_code_ids);
-    test_calc_xyk_balancing_swap(&app, &accs, &astroport_code_ids);
-}
+//     test_balancing_provide_liquidity(&app, &accs, &astroport_code_ids);
+//     test_calc_xyk_balancing_swap(&app, &accs, &astroport_code_ids);
+// }
 
 #[test]
 /// Runs all tests against LocalTerra
@@ -330,9 +331,16 @@ pub fn test_balancing_provide_liquidity<R>(
     let msgs = liquidity_helper
         .balancing_provide_liquidity(assets, Uint128::one(), to_binary(&pool).unwrap(), None)
         .unwrap();
+
+    println!("before res");
+
+    println!("msgs: {:?}", msgs);
+
     let _res = app
         .execute_cosmos_msgs::<MsgExecuteContractResponse>(&msgs, admin)
         .unwrap();
+
+    println!("after res");
 
     // Check pool liquidity after adding
     let mut initial_pool_liquidity = AssetList::new();
@@ -355,6 +363,8 @@ pub fn test_balancing_provide_liquidity<R>(
     let pool_liquidity: PoolResponse = wasm
         .query(&uluna_astro_pair_addr, &PairQueryMsg::Pool {})
         .unwrap();
+
+    println!("pool liqudiity: {:?}", pool_liquidity);
     let pool_liquidity: AssetList = pool_liquidity.assets.to_vec().into();
     assert_eq!(&pool_liquidity, expected_liquidity_after_add);
 }
