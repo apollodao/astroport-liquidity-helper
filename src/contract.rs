@@ -281,7 +281,7 @@ pub fn execute_callback_return_lp_tokens(
 
     if 1 == 1 {
         return Err(ContractError::Std(StdError::GenericErr {
-            msg: "at end of return lp callback".to_string(),
+            msg: format!("return_asset {}", return_asset),
         }));
     }
 
