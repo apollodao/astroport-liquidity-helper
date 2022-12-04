@@ -268,12 +268,6 @@ pub fn execute_callback_return_lp_tokens(
         .add_attribute("return_asset", return_asset.to_string())
         .add_attribute("recipient", recipient);
 
-    if 1 == 1 {
-        return Err(ContractError::Std(StdError::GenericErr {
-            msg: format!("return_asset {}", return_asset),
-        }));
-    }
-
     Ok(Response::new().add_message(msg).add_event(event))
 }
 
