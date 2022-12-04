@@ -695,6 +695,7 @@ dependencies = [
 [[package]]
 name = "cw-it"
 version = "0.1.0"
+source = "git+https://github.com/apollodao/cw-it.git?rev=64baab334a3982d0b41fbc2810d9e311c14337da#64baab334a3982d0b41fbc2810d9e311c14337da"
 dependencies = [
  "anyhow",
  "astroport",
