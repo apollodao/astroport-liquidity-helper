@@ -239,25 +239,14 @@ pub fn execute_callback_provide_liquidity(
     assets: AssetList,
     min_out: Uint128,
     pool: AstroportPool,
-    recipient: Addr,
+    _recipient: Addr,
 ) -> Result<Response, ContractError> {
-    let lp_token_balance = pool
-        .lp_token()
-        .query_balance(&deps.querier, env.contract.address.to_string())?;
-
     let res = pool.provide_liquidity(deps.as_ref(), &env, assets.clone(), min_out)?;
-
-    let callback_msg = CallbackMsg::ReturnLpTokens {
-        pool: pool.clone(),
-        balance_before: lp_token_balance,
-        recipient,
-    }
-    .into_cosmos_msg(&env)?;
 
     let event = Event::new("apollo/astroport-liquidity-helper/execute_callback_provide_liquidity")
         .add_attribute("assets", assets.to_string());
 
-    Ok(res.add_message(callback_msg).add_event(event))
+    Ok(res.add_event(event))
 }
 
 pub fn execute_callback_return_lp_tokens(
