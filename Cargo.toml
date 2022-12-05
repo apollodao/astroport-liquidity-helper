@@ -56,7 +56,7 @@ cw20 = "0.16"
 
 [dev-dependencies]
 cw-multi-test = "0.15.1"
-osmosis-testing = { git = "https://github.com/apollodao/osmosis-rust.git", rev = "28f01fa65b1ba752146d91556835f96ddac30e8c" }
+osmosis-testing = { git = "https://github.com/apollodao/osmosis-rust.git", rev = "8ce8897c416cfa6d9b2d472f00cdb9923a2d47bb" }
 cw-it = { git = "https://github.com/apollodao/cw-it.git", rev = "0fc13cbbf4eb7ff1060e5bc72ee7a57d4aefb5a5", features = ["astroport"] }
 astroport = { git = "https://github.com/apollodao/astroport", rev = "3d1793e6936ca03d8a58c51bbc2611a19566e82a" }
 env_logger = "0.9.0"

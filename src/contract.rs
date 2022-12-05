@@ -65,9 +65,8 @@ pub fn execute(
                     assets,
                     min_out,
                     pool,
-                    recipient,
                 } => execute_callback_provide_liquidity(
-                    deps, env, info, assets, min_out, pool, recipient,
+                    deps, env, info, assets, min_out, pool,
                 ),
                 CallbackMsg::ReturnLpTokens {
                     pool,
@@ -175,7 +174,6 @@ pub fn execute_balancing_provide_liquidity(
                 assets: assets.clone(),
                 min_out,
                 pool: pool.clone(),
-                recipient: recipient.clone(),
             }
             .into_cosmos_msg(&env)?;
             response = response.add_message(provide_msg);
@@ -238,7 +236,6 @@ pub fn execute_callback_provide_liquidity(
     assets: AssetList,
     min_out: Uint128,
     pool: AstroportPool,
-    _recipient: Addr,
 ) -> Result<Response, ContractError> {
     let res = pool.provide_liquidity(deps.as_ref(), &env, assets.clone(), min_out)?;
 
