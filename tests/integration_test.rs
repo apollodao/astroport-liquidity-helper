@@ -12,6 +12,7 @@ use cw_dex::astroport::msg::{PoolResponse, SimulationResponse};
 use cw_dex::astroport::AstroportPool;
 use cw_it::astroport::{create_astroport_pair, instantiate_astroport, upload_astroport_contracts};
 use cw_it::Cli;
+use cw_it::config::TestConfig;
 use cw_it::{app::App as RpcRunner, astroport::AstroportContracts};
 
 use osmosis_testing::OsmosisTestApp;
@@ -47,7 +48,8 @@ pub fn test_with_osmosis_bindings() {
 pub fn test_with_localterra() {
     // let _ = env_logger::builder().is_test(true).try_init();
     let docker: Cli = Cli::default();
-    let app = RpcRunner::new(TEST_CONFIG_PATH, &docker);
+    let test_config = TestConfig::from_yaml(TEST_CONFIG_PATH);
+    let app = RpcRunner::new(test_config, &docker);
 
     let accs = app
         .test_config
