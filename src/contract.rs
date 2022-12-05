@@ -3,8 +3,7 @@ use apollo_utils::responses::merge_responses;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, Event, MessageInfo, Response,
-    StdError, StdResult, Uint128,
+    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, Event, MessageInfo, Response, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw_asset::{Asset, AssetList};
@@ -101,7 +100,7 @@ pub fn execute_balancing_provide_liquidity(
     let receive_res = receive_assets(&info, &env, &assets)?;
 
     // Unwrap recipient or use caller's address
-    let recipient = recipient.map_or(Ok(info.sender.clone()), |x| deps.api.addr_validate(&x))?;
+    let recipient = recipient.map_or(Ok(info.sender), |x| deps.api.addr_validate(&x))?;
 
     // Check lp token balance before, to pass into callback
     let lp_token_balance = pool
@@ -195,9 +194,9 @@ pub fn execute_balancing_provide_liquidity(
                     .add_attribute("assets", assets.to_string())
                     .add_attribute("min_out", min_out);
 
-            return Ok(merge_responses(vec![receive_res, response])
+            Ok(merge_responses(vec![receive_res, response])
                 .add_message(callback_msg)
-                .add_event(event));
+                .add_event(event))
         }
         PairType::Stable {} => {
             // For stable pools we are allowed to provide liquidity in any ratio,
@@ -219,12 +218,12 @@ pub fn execute_balancing_provide_liquidity(
                     .add_attribute("assets", assets.to_string())
                     .add_attribute("min_out", min_out);
 
-            return Ok(merge_responses(vec![receive_res, provide_liquidity_res])
+            Ok(merge_responses(vec![receive_res, provide_liquidity_res])
                 .add_message(callback_msg)
-                .add_event(event));
+                .add_event(event))
         }
-        PairType::Custom(_) => return Err(ContractError::CustomPairType {}),
-    };
+        PairType::Custom(_) => Err(ContractError::CustomPairType {}),
+    }
 }
 
 /// CallbackMsg handler to provide liquidity with the given assets. This needs
