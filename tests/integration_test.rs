@@ -333,15 +333,9 @@ pub fn test_balancing_provide_liquidity<R>(
         .balancing_provide_liquidity(assets, Uint128::one(), to_binary(&pool).unwrap(), None)
         .unwrap();
 
-    println!("before res");
-
-    println!("msgs: {:?}", msgs);
-
     let _res = app
         .execute_cosmos_msgs::<MsgExecuteContractResponse>(&msgs, admin)
         .unwrap();
-
-    println!("after res");
 
     // Check pool liquidity after adding
     let mut initial_pool_liquidity = AssetList::new();
@@ -364,8 +358,6 @@ pub fn test_balancing_provide_liquidity<R>(
     let pool_liquidity: PoolResponse = wasm
         .query(&uluna_astro_pair_addr, &PairQueryMsg::Pool {})
         .unwrap();
-
-    println!("pool liqudiity: {:?}", pool_liquidity);
     let pool_liquidity: AssetList = pool_liquidity.assets.to_vec().into();
     assert_eq!(&pool_liquidity, expected_liquidity_after_add);
 }
