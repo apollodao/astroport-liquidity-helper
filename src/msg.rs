@@ -25,7 +25,6 @@ pub enum CallbackMsg {
         assets: AssetList,
         min_out: Uint128,
         pool: AstroportPool,
-        recipient: Addr,
     },
     ReturnLpTokens {
         pool: AstroportPool,

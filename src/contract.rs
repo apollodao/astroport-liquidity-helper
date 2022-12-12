@@ -3,8 +3,7 @@ use apollo_utils::responses::merge_responses;
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, Event, MessageInfo, Response,
-    StdResult, Uint128,
+    from_binary, to_binary, Addr, Binary, Deps, DepsMut, Env, Event, MessageInfo, Response, StdResult, Uint128,
 };
 use cw2::set_contract_version;
 use cw_asset::{Asset, AssetList};
@@ -66,9 +65,8 @@ pub fn execute(
                     assets,
                     min_out,
                     pool,
-                    recipient,
                 } => execute_callback_provide_liquidity(
-                    deps, env, info, assets, min_out, pool, recipient,
+                    deps, env, info, assets, min_out, pool,
                 ),
                 CallbackMsg::ReturnLpTokens {
                     pool,
@@ -101,7 +99,7 @@ pub fn execute_balancing_provide_liquidity(
     let receive_res = receive_assets(&info, &env, &assets)?;
 
     // Unwrap recipient or use caller's address
-    let recipient = recipient.map_or(Ok(info.sender.clone()), |x| deps.api.addr_validate(&x))?;
+    let recipient = recipient.map_or(Ok(info.sender), |x| deps.api.addr_validate(&x))?;
 
     // Check lp token balance before, to pass into callback
     let lp_token_balance = pool
@@ -176,7 +174,6 @@ pub fn execute_balancing_provide_liquidity(
                 assets: assets.clone(),
                 min_out,
                 pool: pool.clone(),
-                recipient: recipient.clone(),
             }
             .into_cosmos_msg(&env)?;
             response = response.add_message(provide_msg);
@@ -195,9 +192,9 @@ pub fn execute_balancing_provide_liquidity(
                     .add_attribute("assets", assets.to_string())
                     .add_attribute("min_out", min_out);
 
-            return Ok(merge_responses(vec![receive_res, response])
+            Ok(merge_responses(vec![receive_res, response])
                 .add_message(callback_msg)
-                .add_event(event));
+                .add_event(event))
         }
         PairType::Stable {} => {
             // For stable pools we are allowed to provide liquidity in any ratio,
@@ -219,12 +216,12 @@ pub fn execute_balancing_provide_liquidity(
                     .add_attribute("assets", assets.to_string())
                     .add_attribute("min_out", min_out);
 
-            return Ok(merge_responses(vec![receive_res, provide_liquidity_res])
+            Ok(merge_responses(vec![receive_res, provide_liquidity_res])
                 .add_message(callback_msg)
-                .add_event(event));
+                .add_event(event))
         }
-        PairType::Custom(_) => return Err(ContractError::CustomPairType {}),
-    };
+        PairType::Custom(_) => Err(ContractError::CustomPairType {}),
+    }
 }
 
 /// CallbackMsg handler to provide liquidity with the given assets. This needs
@@ -239,25 +236,13 @@ pub fn execute_callback_provide_liquidity(
     assets: AssetList,
     min_out: Uint128,
     pool: AstroportPool,
-    recipient: Addr,
 ) -> Result<Response, ContractError> {
-    let lp_token_balance = pool
-        .lp_token()
-        .query_balance(&deps.querier, env.contract.address.to_string())?;
-
     let res = pool.provide_liquidity(deps.as_ref(), &env, assets.clone(), min_out)?;
-
-    let callback_msg = CallbackMsg::ReturnLpTokens {
-        pool: pool.clone(),
-        balance_before: lp_token_balance,
-        recipient,
-    }
-    .into_cosmos_msg(&env)?;
 
     let event = Event::new("apollo/astroport-liquidity-helper/execute_callback_provide_liquidity")
         .add_attribute("assets", assets.to_string());
 
-    Ok(res.add_message(callback_msg).add_event(event))
+    Ok(res.add_event(event))
 }
 
 pub fn execute_callback_return_lp_tokens(
